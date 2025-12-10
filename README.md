@@ -49,7 +49,7 @@ Ce projet est une application en langage C permettant de gérer des salles, leur
 
 C’est un type personnalisé qui regroupe plusieurs informations dans une seule variable.
 
- 2) Les tableaux de structures :
+2) Les tableaux de structures :
 
 Pour stocker plusieurs salles ou réservations.
 
@@ -78,7 +78,7 @@ qu’il n’y a pas de conflit de réservation
 que la capacité est suffisante
 
 
-7)Les boucles (for, while) :
+7) Les boucles (for, while) :
 
 Elles permettent :
 
