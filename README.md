@@ -91,11 +91,11 @@ d’afficher toutes les réservations
 de supprimer une réservation (décalage du tableau)
 
 
-9) Les menus :
+8) Les menus :
 
 Le programme utilise un menu principal pour guider l’utilisateur.
 
-10) La gestion des erreurs :
+9) La gestion des erreurs :
 
 Messages affichés si :
 
