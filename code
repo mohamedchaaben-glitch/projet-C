@@ -1,0 +1,576 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+
+#define MAX_SALLES 50
+#define MAX_RESERVATIONS 1000
+
+#define MAX_STR 128
+#define MAX_NAME 64
+#define MAX_EQ 128
+#define MAX_DATE 11
+#define MAX_STATUT 20
+#define MAX_CLIENT 80
+
+#define FICHIER_SALLES "salles.dat"
+#define FICHIER_RESERVATIONS "reservations.dat"
+
+
+
+typedef struct {
+    int id;
+    char nom[MAX_NAME];
+    int capacite;
+    float tarif_horaire;
+    char equipements[MAX_EQ];
+} Salle;
+
+typedef struct {
+    int id;
+    char nom_client[MAX_CLIENT];
+    char nom_salle[MAX_NAME];
+    char date[MAX_DATE];
+    int heure_debut;
+    int heure_fin;
+    int nombre_personnes;
+    float montant;
+    char statut[MAX_STATUT];
+} Reservation;
+
+
+Salle salles[MAX_SALLES];
+int nb_salles = 0;
+
+Reservation reservations[MAX_RESERVATIONS];
+int nb_reservations = 0;
+
+
+void chargerDonnees(void);
+void sauvegarderDonnees(void);
+void ajouterSalle(void);
+void creerReservation(void);
+void listerReservations(void);
+void gererReservations(void);
+void rechercherSallesParEquipement(void);
+void afficherStatistiques(void);
+Salle* trouverSalle(const char *nom);
+int dateValide(const char *date);
+void lire_chaine(const char *invite, char *buffer, int taille);
+void viderBuffer(void);
+int verifierDisponibilite(const char *nom_salle, const char *date, int h_debut, int h_fin);
+void genererFacture(const Reservation *r);
+
+
+int dateValide(const char *date)
+{
+    int y, m, d;
+
+    if (sscanf(date, "%d-%d-%d", &y, &m, &d) != 3)
+        return 0;
+
+    if (y < 1 || m < 1 || m > 12 || d < 1 || d > 31)
+        return 0;
+
+    int jours_par_mois[] = {0,31,28,31,30,31,30,31,31,30,31,30,31};
+
+    if ((y % 4 == 0 && y % 100 != 0) || (y % 400 == 0))
+        jours_par_mois[2] = 29;
+
+    if (d > jours_par_mois[m])
+        return 0;
+
+    return 1;
+}
+
+
+
+void lire_chaine(const char *invite, char *buffer, int taille)
+{
+    printf("%s", invite);
+    fgets(buffer, taille, stdin);
+    buffer[strcspn(buffer, "\n")] = 0;
+}
+
+void viderBuffer(void)
+{
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF);
+}
+
+
+
+void sauvegarderDonnees(void)
+{
+    
+    FILE *f_s = fopen(FICHIER_SALLES, "w");
+    if (f_s)
+    {
+        for (int i = 0; i < nb_salles; i++)
+        {
+            fprintf(f_s, "%d;%s;%d;%.2f;%s\n",
+                    salles[i].id,
+                    salles[i].nom,
+                    salles[i].capacite,
+                    salles[i].tarif_horaire,
+                    salles[i].equipements);
+        }
+        fclose(f_s);
+    }
+
+    
+    FILE *f_r = fopen(FICHIER_RESERVATIONS, "w");
+    if (f_r)
+    {
+        for (int i = 0; i < nb_reservations; i++)
+        {
+            fprintf(f_r, "%d;%s;%s;%s;%d;%d;%d;%.2f;%s\n",
+                    reservations[i].id,
+                    reservations[i].nom_client,
+                    reservations[i].nom_salle,
+                    reservations[i].date,
+                    reservations[i].heure_debut,
+                    reservations[i].heure_fin,
+                    reservations[i].nombre_personnes,
+                    reservations[i].montant,
+                    reservations[i].statut);
+        }
+        fclose(f_r);
+    }
+
+    printf("[Systeme] Donnees sauvegardees.\n");
+}
+
+
+void chargerDonnees(void)
+{
+    nb_salles = 0;
+    nb_reservations = 0;
+
+    FILE *f_s = fopen(FICHIER_SALLES, "r");
+    if (f_s)
+    {
+        while (!feof(f_s) && nb_salles < MAX_SALLES)
+        {
+            Salle s;
+            if (fscanf(f_s, "%d;%[^;];%d;%f;%[^\n]\n",
+                       &s.id,
+                       s.nom,
+                       &s.capacite,
+                       &s.tarif_horaire,
+                       s.equipements) == 5)
+            {
+                salles[nb_salles++] = s;
+            }
+        }
+        fclose(f_s);
+    }
+
+    FILE *f_r = fopen(FICHIER_RESERVATIONS, "r");
+    if (f_r)
+    {
+        while (!feof(f_r) && nb_reservations < MAX_RESERVATIONS)
+        {
+            Reservation r;
+            if (fscanf(f_r, "%d;%[^;];%[^;];%[^;];%d;%d;%d;%f;%[^\n]\n",
+                       &r.id,
+                       r.nom_client,
+                       r.nom_salle,
+                       r.date,
+                       &r.heure_debut,
+                       &r.heure_fin,
+                       &r.nombre_personnes,
+                       &r.montant,
+                       r.statut) == 9)
+            {
+                reservations[nb_reservations++] = r;
+            }
+        }
+        fclose(f_r);
+    }
+
+    printf("[Systeme] %d salles et %d reservations chargees.\n", nb_salles, nb_reservations);
+}
+
+
+
+Salle* trouverSalle(const char *nom)
+{
+    for (int i = 0; i < nb_salles; i++)
+    {
+        if (strcmp(salles[i].nom, nom) == 0)
+            return &salles[i];
+    }
+    return NULL;
+}
+
+
+
+void ajouterSalle(void)
+{
+    if (nb_salles >= MAX_SALLES)
+    {
+        printf("Limite atteinte.\n");
+        return;
+    }
+
+    Salle s;
+    s.id = nb_salles + 1;
+
+    lire_chaine("Nom salle : ", s.nom, MAX_NAME);
+
+    if (trouverSalle(s.nom))
+    {
+        printf("Cette salle existe deja.\n");
+        return;
+    }
+
+    printf("Capacite : ");
+    scanf("%d", &s.capacite);
+
+    printf("Tarif (DT/h) : ");
+    scanf("%f", &s.tarif_horaire);
+    viderBuffer();
+
+    lire_chaine("Equipements : ", s.equipements, MAX_EQ);
+
+    salles[nb_salles++] = s;
+    sauvegarderDonnees();
+
+    printf("Salle ajoutee.\n");
+}
+
+
+int verifierDisponibilite(const char *nom_salle, const char *date, int h_debut, int h_fin)
+{
+    for (int i = 0; i < nb_reservations; i++)
+    {
+        if (strcmp(reservations[i].nom_salle, nom_salle) == 0 &&
+            strcmp(reservations[i].date, date) == 0 &&
+            strcmp(reservations[i].statut, "Confirmee") == 0)
+        {
+            if (h_debut < reservations[i].heure_fin &&
+                h_fin > reservations[i].heure_debut)
+                return 0;
+        }
+    }
+    return 1;
+}
+
+
+
+void creerReservation(void)
+{
+    if (nb_reservations >= MAX_RESERVATIONS)
+    {
+        printf("Limite atteinte.\n");
+        return;
+    }
+
+    Reservation r;
+    r.id = nb_reservations + 1;
+
+    lire_chaine("Nom client : ", r.nom_client, MAX_CLIENT);
+
+    printf("Salles disponibles :\n");
+    for (int i = 0; i < nb_salles; i++)
+        printf(" - %s (cap %d)\n", salles[i].nom, salles[i].capacite);
+
+    lire_chaine("Nom salle : ", r.nom_salle, MAX_NAME);
+    Salle *s = trouverSalle(r.nom_salle);
+
+    if (!s)
+    {
+        printf("Salle introuvable.\n");
+        return;
+    }
+
+    do {
+        lire_chaine("Date (YYYY-MM-DD) : ", r.date, MAX_DATE);
+        if (!dateValide(r.date))
+            printf("Date invalide.\n");
+    } while (!dateValide(r.date));
+
+    printf("Heure debut : ");
+    scanf("%d", &r.heure_debut);
+
+    printf("Heure fin : ");
+    scanf("%d", &r.heure_fin);
+
+    if (r.heure_debut < 0 || r.heure_fin > 24 || r.heure_fin <= r.heure_debut)
+    {
+        printf("Plage invalide.\n");
+        return;
+    }
+
+    printf("Nombre personnes : ");
+    scanf("%d", &r.nombre_personnes);
+
+    if (r.nombre_personnes > s->capacite)
+    {
+        printf("Capacite insuffisante.\n");
+        return;
+    }
+
+    if (!verifierDisponibilite(r.nom_salle, r.date, r.heure_debut, r.heure_fin))
+    {
+        printf("Creneau occupe.\n");
+        return;
+    }
+
+    int duree = r.heure_fin - r.heure_debut;
+    r.montant = duree * s->tarif_horaire;
+    strcpy(r.statut, "Confirmee");
+
+    reservations[nb_reservations++] = r;
+
+    genererFacture(&r);
+    sauvegarderDonnees();
+
+    printf("Reservation creee.\n");
+}
+
+
+void genererFacture(const Reservation *r)
+{
+    char nom_fichier[64];
+    sprintf(nom_fichier, "facture_%d.txt", r->id);
+
+    FILE *f = fopen(nom_fichier, "w");
+    if (!f) return;
+
+    fprintf(f, "FACTURE\n");
+    fprintf(f, "Client : %s\n", r->nom_client);
+    fprintf(f, "Salle  : %s\n", r->nom_salle);
+    fprintf(f, "Date   : %s\n", r->date);
+    fprintf(f, "Montant: %.2f DT\n", r->montant);
+
+    fclose(f);
+}
+
+
+
+void listerReservations(void)
+{
+    if (nb_reservations == 0)
+    {
+        printf("Aucune reservation.\n");
+        return;
+    }
+
+    for (int i = 0; i < nb_reservations; i++)
+    {
+        Reservation *r = &reservations[i];
+        printf("#%d : %s -> %s le %s (%dh-%dh) %.2f DT [%s]\n",
+               r->id, r->nom_client, r->nom_salle, r->date,
+               r->heure_debut, r->heure_fin, r->montant, r->statut);
+    }
+}
+
+
+
+void gererReservations(void) {
+    int id_res, choix_action;
+    Reservation *r = NULL;
+
+    listerReservations();
+    printf("ID de la reservation : ");
+    scanf("%d", &id_res);
+    viderBuffer();
+
+    for (int i = 0; i < nb_reservations; i++) {
+        if (reservations[i].id == id_res) {
+            r = &reservations[i];
+            break;
+        }
+    }
+
+    if (!r) { printf("Reservation introuvable.\n"); return; }
+
+    printf("1. Annuler\n2. Modifier nb personnes\n");
+    scanf("%d", &choix_action);
+    viderBuffer();
+
+    if (choix_action == 1) {
+        strcpy(r->statut, "Annulée");
+        printf("Reservation annulee.\n");
+    }
+    else if (choix_action == 2) {
+        int nb;
+        printf("Nouveau nombre : ");
+        scanf("%d", &nb);
+        viderBuffer();
+
+        Salle *s = trouverSalle(r->nom_salle);
+        if (nb > s->capacite)
+            printf("Depasse la capacite.\n");
+        else {
+            r->nombre_personnes = nb;
+            printf("Modifie.\n");
+        }
+    }
+
+    sauvegarderDonnees();
+
+    printf("Introuvable.\n");
+}
+
+
+void rechercherSallesParEquipement(void)
+{
+    char eq[MAX_EQ];
+    lire_chaine("Equipement : ", eq, MAX_EQ);
+
+    for (int i = 0; i < nb_salles; i++)
+    {
+        if (strstr(salles[i].equipements, eq))
+            printf(" - %s (%s)\n", salles[i].nom, salles[i].equipements);
+    }
+}
+
+
+
+void afficherStatistiques(void)
+{
+    printf("\n===== STATISTIQUES =====\n");
+    printf("Total salles : %d\n", nb_salles);
+    printf("Total reservations : %d\n\n", nb_reservations);
+
+    
+    printf("---- Chiffre d'affaire par salle ----\n");
+    float CA[ MAX_SALLES ] = {0};
+
+    for (int i = 0; i < nb_reservations; i++)
+    {
+        if (strcmp(reservations[i].statut, "Confirmee") == 0)
+        {
+            for (int j = 0; j < nb_salles; j++)
+            {
+                if (strcmp(reservations[i].nom_salle, salles[j].nom) == 0)
+                {
+                    CA[j] += reservations[i].montant;
+                }
+            }
+        }
+    }
+
+    for (int i = 0; i < nb_salles; i++)
+    {
+        printf("Salle %-15s : %.2f DT\n", salles[i].nom, CA[i]);
+    }
+
+    
+    printf("\n---- Nombre de reservations par mois ----\n");
+
+    int count_mois[12] = {0};   // Janvier = 0 ... Décembre = 11
+    int y, m, d;
+
+    for (int i = 0; i < nb_reservations; i++)
+    {
+        if (sscanf(reservations[i].date, "%d-%d-%d", &y, &m, &d) == 3)
+        {
+            if (m >= 1 && m <= 12)
+                count_mois[m - 1]++;
+        }
+    }
+
+    const char *noms_mois[12] = {
+        "Janvier","Fevrier","Mars","Avril","Mai","Juin",
+        "Juillet","Aout","Septembre","Octobre","Novembre","Decembre"
+    };
+
+    for (int i = 0; i < 12; i++)
+        printf("%-10s : %d reservations\n", noms_mois[i], count_mois[i]);
+
+  
+    printf("\n---- Salles les plus populaires ----\n");
+
+    int popularite[MAX_SALLES] = {0};
+
+    for (int i = 0; i < nb_reservations; i++)
+    {
+        if (strcmp(reservations[i].statut, "Confirmee") == 0)
+        {
+            for (int j = 0; j < nb_salles; j++)
+            {
+                if (strcmp(reservations[i].nom_salle, salles[j].nom) == 0)
+                    popularite[j]++;
+            }
+        }
+    }
+
+   
+    for (int i = 0; i < nb_salles; i++)
+    {
+        for (int j = i + 1; j < nb_salles; j++)
+        {
+            if (popularite[j] > popularite[i])
+            {
+                int tmp = popularite[i];
+                popularite[i] = popularite[j];
+                popularite[j] = tmp;
+
+                Salle s_tmp = salles[i];
+                salles[i] = salles[j];
+                salles[j] = s_tmp;
+            }
+        }
+    }
+
+    for (int i = 0; i < nb_salles; i++)
+        printf("%-15s : %d reservations\n", salles[i].nom, popularite[i]);
+
+    printf("\n=====================================\n");
+}
+
+
+
+void menu(void)
+{
+    int choix;
+
+    do {
+        printf("\n==== MENU ====\n");
+        printf("1. Ajouter salle\n");
+        printf("2. Faire reservation\n");
+        printf("3. Lister reservations\n");
+        printf("4. Gerer reservation\n");
+        printf("5. Recherche equipement\n");
+        printf("6. Statistiques\n");
+        printf("7. Quitter\n");
+        printf("Choix : ");
+        scanf("%d", &choix);
+        viderBuffer();
+
+        switch (choix)
+        {
+            case 1: ajouterSalle(); break;
+            case 2: creerReservation(); break;
+            case 3: listerReservations(); break;
+            case 4: gererReservations(); break;
+            case 5: rechercherSallesParEquipement(); break;
+            case 6: afficherStatistiques(); break;
+        }
+
+    } while (choix != 7);
+}
+
+
+
+int main(void)
+{
+    // Création automatique des fichiers
+    FILE *f;
+
+    f = fopen(FICHIER_SALLES, "a");
+    if (f) fclose(f);
+
+    f = fopen(FICHIER_RESERVATIONS, "a");
+    if (f) fclose(f);
+
+    chargerDonnees();
+    menu();
+    sauvegarderDonnees();
+
+    return 0;
+}
