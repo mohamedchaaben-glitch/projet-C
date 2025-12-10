@@ -3,7 +3,7 @@
 #include <string.h>
 
 
-#define MAX_SALLES 50
+#define MAX_SALLES 500
 #define MAX_RESERVATIONS 1000
 
 #define MAX_STR 128
