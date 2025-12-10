@@ -1,5 +1,6 @@
-Gestion des Réservations de Salles — Projet en C :
+PROJET 3 : Système De Gestion De Réservation :
 
+Gestion des Réservations de Salles — Projet en C :
 Ce projet est une application en langage C permettant de gérer des salles, leurs réservations, les clients ainsi que plusieurs fonctionnalités avancées : disponibilité, statistiques, annulation, facturation, recherche par équipement, etc.
 
 --Fonctionnalités principales
